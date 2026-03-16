@@ -1,0 +1,12 @@
+package ru.nsu.ccfit.veronika.calculator.commands;
+
+import ru.nsu.ccfit.veronika.calculator.context.ExecContext;
+import ru.nsu.ccfit.veronika.calculator.exceptions.CalculatorException;
+
+import java.util.List;
+
+public class PrintCommand implements Command {
+    public void execute(ExecContext context, List<String> args) throws CalculatorException {
+        context.printTop();
+    }
+}
