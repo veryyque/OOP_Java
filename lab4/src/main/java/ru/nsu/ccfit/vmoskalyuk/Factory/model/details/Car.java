@@ -10,7 +10,7 @@ public class Car {
     private final Accessory accessory;
 
     public Car(Body body, Motor motor, Accessory accessory) {
-
+        // Проверка на null
         if (body == null || motor == null || accessory == null) {
             throw new IllegalArgumentException("Все три детали должны быть не null");
         }

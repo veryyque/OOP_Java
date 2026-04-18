@@ -2,11 +2,12 @@ package ru.nsu.ccfit.vmoskalyuk.Factory.ThreadPool;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ThreadPool {
     private final Queue<Runnable> taskQueue = new LinkedList<>();
     private final Thread[] workers;
-    private volatile boolean running = true;
+    private final AtomicBoolean running = new AtomicBoolean(true);
 
     public ThreadPool(int poolSize) {
         workers = new Thread[poolSize];
@@ -18,9 +19,12 @@ public class ThreadPool {
     }
 
     public void submit(Runnable task) {
+        if (!running.get() || task == null) {
+            return;
+        }
         synchronized (taskQueue) {
             taskQueue.add(task);
-            taskQueue.notify();
+            taskQueue.notifyAll();
         }
     }
 
@@ -31,10 +35,18 @@ public class ThreadPool {
     }
 
     public void shutdown() {
-        running = false;
+        running.set(false);
         for (Thread worker : workers) worker.interrupt();
         synchronized (taskQueue) {
             taskQueue.notifyAll();
+        }
+        for (Thread worker : workers) {
+            try {
+                worker.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
 }

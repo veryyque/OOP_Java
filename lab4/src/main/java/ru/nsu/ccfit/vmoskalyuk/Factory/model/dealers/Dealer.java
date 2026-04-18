@@ -4,29 +4,31 @@ package ru.nsu.ccfit.vmoskalyuk.Factory.model.dealers;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.details.Car;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.storage.Storage;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observer;
-import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observable;
 
-import java.io.*;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.logging.Logger;
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class Dealer implements Runnable {
 
-    private static final Logger LOGGER = Logger.getLogger(Dealer.class.getName());
-    private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss.SSS");
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
     private final Storage<Car> carStorage;
     private final int number;
     private final Observer saleObserver;
+    private final PrintWriter logWriter;        // единый лог от CarFactory
+    private final boolean saleLoggingEnabled;
 
     private volatile int delayMs;
     private volatile boolean running = true;
 
-    public Dealer(Storage<Car> carStorage, int number, Observer saleObserver, int initialDelay) {
+    public Dealer(Storage<Car> carStorage, int number, Observer saleObserver,
+                  int initialDelay, PrintWriter logWriter, boolean saleLoggingEnabled) {
         this.carStorage = carStorage;
         this.number = number;
         this.saleObserver = saleObserver;
+        this.logWriter = logWriter;
+        this.saleLoggingEnabled = saleLoggingEnabled;
         this.delayMs = Math.max(10, initialDelay);
     }
 
@@ -40,13 +42,11 @@ public class Dealer implements Runnable {
             try {
                 Car car = carStorage.take();
 
-                if (car == null) {
-                    break;
-                }
+                if (car == null) continue;
 
                 logSale(car);
 
-                //Уведомляем через Observer - передача CarFactory
+                // Уведомляем CarFactory через Observer
                 if (saleObserver != null) {
                     saleObserver.update(null, new SaleEvent(number, car));
                 }
@@ -54,7 +54,6 @@ public class Dealer implements Runnable {
                 Thread.sleep(delayMs);
 
             } catch (InterruptedException e) {
-                LOGGER.info("Dealer " + number + " interrupted");
                 Thread.currentThread().interrupt();
                 break;
             }
@@ -62,25 +61,22 @@ public class Dealer implements Runnable {
     }
 
     private void logSale(Car car) {
-        String time = TIME_FORMAT.format(new Date());
+        if (!saleLoggingEnabled) {
+            return;
+        }
+        String timestamp = LocalDateTime.now().format(TIME_FORMAT);
         String logLine = String.format("%s: Dealer %d: Auto %d (Body: %d, Motor: %d, Accessory: %d)",
-                time, number, car.getId(),
+                timestamp, number, car.getId(),
                 car.getBody().getId(), car.getMotor().getId(), car.getAccessory().getId());
 
-        LOGGER.info(logLine);
-
-        try (FileWriter fw = new FileWriter("factory_log.txt", true);
-             BufferedWriter bw = new BufferedWriter(fw)) {
-            bw.write(logLine);
-            bw.newLine();
-        } catch (IOException e) {
-            LOGGER.warning("Ошибка записи лога: " + e.getMessage());
+        synchronized (logWriter) {
+            logWriter.println(logLine);
+            logWriter.flush();
         }
     }
 
     public void shutdown() {
         running = false;
-        Thread.currentThread().interrupt();
     }
 
     public static class SaleEvent {

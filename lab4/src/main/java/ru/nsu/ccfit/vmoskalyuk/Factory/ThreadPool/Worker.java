@@ -2,26 +2,27 @@
 package ru.nsu.ccfit.vmoskalyuk.Factory.ThreadPool;
 
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Worker implements Runnable {
     private final Queue<Runnable> taskQueue;
-    private volatile boolean running;
+    private final AtomicBoolean running;
 
-    public Worker(Queue<Runnable> taskQueue, boolean running) {
+    public Worker(Queue<Runnable> taskQueue, AtomicBoolean running) {
         this.taskQueue = taskQueue;
         this.running = running;
     }
 
     @Override
     public void run() {
-        while (running && !Thread.currentThread().isInterrupted()) {
+        while (running.get() && !Thread.currentThread().isInterrupted()) {
             Runnable task;
             synchronized (taskQueue) {
-                while (taskQueue.isEmpty() && running) {
+                while (taskQueue.isEmpty() && running.get()) {
                     try { taskQueue.wait(); }
                     catch (InterruptedException e) { return; }
                 }
-                if (!running) return;
+                if (!running.get()) return;
                 task = taskQueue.poll();
             }
             if (task != null) task.run();

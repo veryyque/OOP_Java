@@ -19,6 +19,13 @@ public class FactoryController {
 
         model.addListener(this::updateView);
 
+        view.setInitialDelays(
+                model.getInitialBodyDelay(),
+                model.getInitialMotorDelay(),
+                model.getInitialAccessoryDelay(),
+                model.getInitialDealerDelay()
+        );
+
         view.setBodySpeedListener(model::setBodyDelay);
         view.setMotorSpeedListener(model::setMotorDelay);
         view.setAccessorySpeedListener(model::setAccessoryDelay);
@@ -50,9 +57,9 @@ public class FactoryController {
                     model.getMotorCount(),
                     model.getAccessoryCount(),
                     model.getCarCount(),
-                    model.getTotalBodiesProduced(),      // добавлено
-                    model.getTotalMotorsProduced(),      // добавлено
-                    model.getTotalAccessoriesProduced(), // добавлено
+                    model.getTotalBodiesProduced(),
+                    model.getTotalMotorsProduced(),
+                    model.getTotalAccessoriesProduced(),
                     model.getTotalCarsProduced(),
                     model.getPendingTasks()
             );

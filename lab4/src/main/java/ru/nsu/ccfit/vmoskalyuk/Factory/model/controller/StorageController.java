@@ -5,15 +5,23 @@ import ru.nsu.ccfit.vmoskalyuk.Factory.model.storage.Storage;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observer;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observable;
 
+import java.util.function.IntSupplier;
+
 public class StorageController extends Thread implements Observer {
 
     private final Storage<Car> carStorage;
     private final Runnable requestAssemblyCallback;
+    private final IntSupplier pendingTasksSupplier;
+    private final Object signalLock = new Object();
     private volatile boolean running = true;
+    private boolean hasSignal = false;
 
-    public StorageController(Storage<Car> carStorage, Runnable requestAssemblyCallback) {
+    public StorageController(Storage<Car> carStorage,
+                             Runnable requestAssemblyCallback,
+                             IntSupplier pendingTasksSupplier) {
         this.carStorage = carStorage;
         this.requestAssemblyCallback = requestAssemblyCallback;
+        this.pendingTasksSupplier = pendingTasksSupplier;
         setName("StorageController");
 
         carStorage.addObserver(this);
@@ -22,29 +30,36 @@ public class StorageController extends Thread implements Observer {
     @Override
     public void update(Observable o, Object arg) {
         if ("take".equals(arg)) {
-            requestAssemblyCallback.run();
+            synchronized (signalLock) {
+                hasSignal = true;
+                signalLock.notifyAll();
+            }
         }
     }
 
-    private void orderMissingCars() {
-        int freeSlots = carStorage.getMaxSize() - carStorage.size();
-        for (int i = 0; i < freeSlots; i++) {
+    private void orderMissingCarsIfNeeded() {
+        int missingCars = carStorage.getMaxSize() - carStorage.size() - pendingTasksSupplier.getAsInt();
+        for (int i = 0; i < missingCars; i++) {
             requestAssemblyCallback.run();
         }
     }
 
     @Override
     public void run() {
-        //заказ изначально на треть от размера склада машин
-        int initial = carStorage.getMaxSize() / 3;
-        for (int i = 0; i < initial; i++) {
-            requestAssemblyCallback.run();
-        }
+        orderMissingCarsIfNeeded();
 
         while (running && !isInterrupted()) {
             try {
-                Thread.sleep(2000);
-                orderMissingCars(); //на всякий случай
+                synchronized (signalLock) {
+                    while (running && !hasSignal) {
+                        signalLock.wait();
+                    }
+                    hasSignal = false;
+                }
+                if (!running || isInterrupted()) {
+                    break;
+                }
+                orderMissingCarsIfNeeded();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -54,6 +69,10 @@ public class StorageController extends Thread implements Observer {
 
     public void shutdown() {
         running = false;
+        synchronized (signalLock) {
+            hasSignal = true;
+            signalLock.notifyAll();
+        }
         interrupt();
         carStorage.deleteObserver(this);
     }

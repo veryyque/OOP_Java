@@ -3,11 +3,12 @@ package ru.nsu.ccfit.vmoskalyuk.Factory.model.suppliers;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.details.Accessory;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.storage.Storage;
 
-public class AccessorySupplier extends Supplier<Accessory> {
-    private static int counter = 0;
+import java.io.PrintWriter;
 
-    public AccessorySupplier(Storage<Accessory> storage, int delayMs) {
-        super(storage, delayMs, "AccessorySupplier-" + (++counter));
+public class AccessorySupplier extends Supplier<Accessory> {
+
+    public AccessorySupplier(Storage<Accessory> storage, int delayMs, int supplierNumber, PrintWriter logWriter) {
+        super(storage, delayMs, "AccessorySupplier-" + supplierNumber, logWriter);
     }
 
     @Override

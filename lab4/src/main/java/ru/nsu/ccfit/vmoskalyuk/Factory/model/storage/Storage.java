@@ -1,76 +1,80 @@
 package ru.nsu.ccfit.vmoskalyuk.Factory.model.storage;
 
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observable;
+
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedList;
 
 public class Storage<T> extends Observable {
 
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
     private final LinkedList<T> items = new LinkedList<>();
     private final int maxSize;
     private final String name;
+    private final PrintWriter logWriter;
 
     private int totalProduced = 0;
     private int totalConsumed = 0;
 
-    public Storage(int maxSize, String name) {
+    public Storage(int maxSize, String name, PrintWriter logWriter) {
         this.maxSize = maxSize;
         this.name = name;
+        this.logWriter = logWriter;
+        log("Склад создан (вместимость = " + maxSize + ")");
     }
 
-    public void put(T item) {
+    private void log(String message) {
+        String ts = LocalDateTime.now().format(TIME_FORMAT);
+        synchronized (logWriter) {
+            logWriter.println("[" + ts + "] [" + name + "] " + message);
+        }
+    }
+
+    public void put(T item) throws InterruptedException {
         if (item == null) return;
 
-        synchronized (items) {
-            try {
-                while (items.size() >= maxSize) {
-                    if (Thread.currentThread().isInterrupted()) return;
-                    items.wait();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+        synchronized (this) {
+            while (items.size() >= maxSize) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                wait();
             }
 
             items.addFirst(item);
             totalProduced++;
-            items.notifyAll();
-        }
 
-        setChanged();
-        notifyObservers("put");
+            log("+ PUT " + item);
+            notifyAll();
+            notifyObservers("put");
+        }
     }
+
     public T take() throws InterruptedException {
-        synchronized (items) {
-            try {
-                while (items.isEmpty()) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        throw new InterruptedException();
-                    }
-                    items.wait();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw e;                       // пробрасываем дальше
+        synchronized (this) {
+            while (items.isEmpty()) {
+                if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+                wait();
             }
 
             T item = items.removeLast();
             totalConsumed++;
-            items.notifyAll();
+
+            log("- TAKE " + item);
+            notifyAll();
+            notifyObservers("take");
+
             return item;
         }
     }
 
     public int size() {
-        synchronized (items) {
-            return items.size();
-        }
+        synchronized (this) { return items.size(); }
     }
 
-    public int getMaxSize() {
-        return maxSize;
-    }
-
-    public int getTotalProduced() { return totalProduced; }
-    public int getTotalConsumed() { return totalConsumed; }
+    public int getMaxSize() { return maxSize; }
+    public int getTotalProduced() { synchronized (this) { return totalProduced; } }
+    public int getTotalConsumed() { synchronized (this) { return totalConsumed; } }
     public String getName() { return name; }
 }
