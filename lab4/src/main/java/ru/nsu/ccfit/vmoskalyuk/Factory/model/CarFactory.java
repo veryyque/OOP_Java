@@ -2,8 +2,6 @@ package ru.nsu.ccfit.vmoskalyuk.Factory.model;
 
 import ru.nsu.ccfit.vmoskalyuk.Factory.config.Config;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.details.*;
-import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observable;
-import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observer;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.storage.Storage;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.suppliers.*;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.dealers.Dealer;
@@ -19,10 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CarFactory extends Observable implements Observer {
+public class CarFactory {
 
-    private static final DateTimeFormatter LOG_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final DateTimeFormatter LOG_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
     private final Config config;
 
@@ -45,7 +42,7 @@ public class CarFactory extends Observable implements Observer {
     private final AtomicInteger totalCarsProduced = new AtomicInteger(0);
     private final boolean saleLoggingEnabled;
 
-    private final PrintWriter logWriter;   // ЕДИНЫЙ лог для всего
+    private final PrintWriter logWriter;
 
     private final List<ModelListener> listeners = new ArrayList<>();
 
@@ -57,32 +54,27 @@ public class CarFactory extends Observable implements Observer {
         this.config = config;
         this.saleLoggingEnabled = config.getBoolean("log.sale");
 
-        // Создаём единый лог-файл
         this.logWriter = createLogWriter();
 
-        // Склады
         bodyStorage = new Storage<>(config.getInt("storage.body.size"), "BodyStorage", logWriter);
         motorStorage = new Storage<>(config.getInt("storage.motor.size"), "MotorStorage", logWriter);
         accessoryStorage = new Storage<>(config.getInt("storage.accessory.size"), "AccessoryStorage", logWriter);
         carStorage = new Storage<>(config.getInt("storage.car.size"), "CarStorage", logWriter);
 
-        // Поставщики (с передачей logWriter)
         bodySupplier = new BodySupplier(bodyStorage, config.getInt("delay.body"), logWriter);
         motorSupplier = new MotorSupplier(motorStorage, config.getInt("delay.motor"), logWriter);
 
         int accCount = config.getInt("suppliers.accessory.count");
         for (int i = 0; i < accCount; i++) {
-            accessorySuppliers.add(new AccessorySupplier(accessoryStorage,
-                    config.getInt("delay.accessory"), i + 1, logWriter));
+            accessorySuppliers.add(new AccessorySupplier(accessoryStorage, config.getInt("delay.accessory"), i + 1, logWriter));
         }
 
         threadPool = new ThreadPool(config.getInt("workers.count"));
         storageController = new StorageController(carStorage, this::requestAssembly, threadPool::getQueueSize);
 
-        // Дилеры
         int dealersCount = config.getInt("dealers.count");
         for (int i = 1; i <= dealersCount; i++) {
-            Dealer dealer = new Dealer(carStorage, i, this, config.getInt("delay.dealer"), logWriter, saleLoggingEnabled);
+            Dealer dealer = new Dealer(carStorage, i, this::onCarSold, config.getInt("delay.dealer"), logWriter, saleLoggingEnabled);
             dealers.add(dealer);
             dealerThreads.add(new Thread(dealer, "Dealer-" + i));
         }
@@ -90,7 +82,6 @@ public class CarFactory extends Observable implements Observer {
         log("Фабрика инициализирована");
     }
 
-    /** Создаёт PrintWriter для factory.log */
     private PrintWriter createLogWriter() {
         try {
             PrintWriter writer = new PrintWriter(new FileWriter("factory.log", true), true);
@@ -102,7 +93,6 @@ public class CarFactory extends Observable implements Observer {
         }
     }
 
-    /** Единый метод логирования — используется всей фабрикой */
     public void log(String message) {
         String timestamp = LocalDateTime.now().format(LOG_FORMATTER);
         String fullLine = "[" + timestamp + "] " + message;
@@ -110,12 +100,11 @@ public class CarFactory extends Observable implements Observer {
         synchronized (logWriter) {
             logWriter.println(fullLine);
         }
-        System.out.println(fullLine); // дублируем в консоль
+        System.out.println(fullLine);
     }
 
     private void requestAssembly() {
-        AssemblyTask task = new AssemblyTask(
-                bodyStorage, motorStorage, accessoryStorage, carStorage, this, logWriter);
+        AssemblyTask task = new AssemblyTask(bodyStorage, motorStorage, accessoryStorage, carStorage, this, logWriter);
         threadPool.submit(task);
     }
 
@@ -124,19 +113,10 @@ public class CarFactory extends Observable implements Observer {
         notifyListeners();
     }
 
-    private void onCarSold(int dealerNumber, Car car) {
+    private void onCarSold(Dealer.SaleEvent event) {
         notifyListeners();
     }
 
-    @Override
-    public void update(Observable o, Object arg) {
-        if (arg instanceof Dealer.SaleEvent) {
-            Dealer.SaleEvent event = (Dealer.SaleEvent) arg;
-            onCarSold(event.dealerNumber, event.car);
-        }
-    }
-
-    // ====================== Управление скоростью ======================
     public void setBodyDelay(int delay) {
         bodySupplier.setDelay(delay);
         log("[GUI] Скорость кузовов → " + delay + " мс");
@@ -157,28 +137,13 @@ public class CarFactory extends Observable implements Observer {
         log("[GUI] Скорость дилеров → " + delay + " мс");
     }
 
-    // ====================== Геттеры для GUI ======================
+    //геттеры
     public int getBodyCount() { return bodyStorage.size(); }
     public int getMotorCount() { return motorStorage.size(); }
     public int getAccessoryCount() { return accessoryStorage.size(); }
     public int getCarCount() { return carStorage.size(); }
     public int getTotalCarsProduced() { return totalCarsProduced.get(); }
     public int getPendingTasks() { return threadPool.getQueueSize(); }
-    public int getBodyCapacity() {
-        return bodyStorage.getMaxSize();
-    }
-
-    public int getMotorCapacity() {
-        return motorStorage.getMaxSize();
-    }
-
-    public int getAccessoryCapacity() {
-        return accessoryStorage.getMaxSize();
-    }
-
-    public int getCarCapacity() {
-        return carStorage.getMaxSize();
-    }
     public int getTotalBodiesProduced() { return bodyStorage.getTotalProduced(); }
     public int getTotalMotorsProduced() { return motorStorage.getTotalProduced(); }
     public int getTotalAccessoriesProduced() { return accessoryStorage.getTotalProduced(); }
@@ -195,7 +160,6 @@ public class CarFactory extends Observable implements Observer {
         listeners.forEach(ModelListener::onModelChanged);
     }
 
-    // ====================== Запуск и остановка ======================
     public void start() {
         supplierThreads.add(new Thread(bodySupplier, "BodySupplier"));
         supplierThreads.add(new Thread(motorSupplier, "MotorSupplier"));
@@ -212,20 +176,35 @@ public class CarFactory extends Observable implements Observer {
 
     public void shutdown() {
         log("Остановка фабрики...");
-        bodySupplier.shutdown();
-        motorSupplier.shutdown();
-        accessorySuppliers.forEach(AccessorySupplier::shutdown);
-        dealers.forEach(Dealer::shutdown);
 
         supplierThreads.forEach(Thread::interrupt);
         dealerThreads.forEach(Thread::interrupt);
 
         threadPool.shutdown();
         storageController.shutdown();
+        joinThreads(supplierThreads, "supplier");
+        joinThreads(dealerThreads, "dealer");
+        try {
+            storageController.join(2000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
         log("=== ФАБРИКА ОСТАНОВЛЕНА ===");
         if (logWriter != null) {
             logWriter.close();
+        }
+    }
+
+    private void joinThreads(List<Thread> threads, String threadGroupName) {
+        for (Thread thread : threads) {
+            try {
+                thread.join(2000);
+            } catch (InterruptedException e) {
+                log("Interrupted while waiting for " + threadGroupName + " threads");
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 }

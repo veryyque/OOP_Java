@@ -7,8 +7,7 @@ public class Config {
     private final Properties props = new Properties();
 
     public Config() {
-        try (InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("factory.properties")) {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream("factory.properties")) {
             if (is != null) {
                 props.load(is);
             } else {

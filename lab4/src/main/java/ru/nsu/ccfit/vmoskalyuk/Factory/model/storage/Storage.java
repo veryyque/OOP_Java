@@ -1,13 +1,11 @@
 package ru.nsu.ccfit.vmoskalyuk.Factory.model.storage;
 
-import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observable;
-
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedList;
 
-public class Storage<T> extends Observable {
+public class Storage<T> {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
@@ -47,7 +45,6 @@ public class Storage<T> extends Observable {
 
             log("+ PUT " + item);
             notifyAll();
-            notifyObservers("put");
         }
     }
 
@@ -63,8 +60,6 @@ public class Storage<T> extends Observable {
 
             log("- TAKE " + item);
             notifyAll();
-            notifyObservers("take");
-
             return item;
         }
     }
@@ -75,6 +70,4 @@ public class Storage<T> extends Observable {
 
     public int getMaxSize() { return maxSize; }
     public int getTotalProduced() { synchronized (this) { return totalProduced; } }
-    public int getTotalConsumed() { synchronized (this) { return totalConsumed; } }
-    public String getName() { return name; }
 }

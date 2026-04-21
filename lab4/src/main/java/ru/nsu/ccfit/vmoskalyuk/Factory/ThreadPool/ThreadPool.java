@@ -7,19 +7,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ThreadPool {
     private final Queue<Runnable> taskQueue = new LinkedList<>();
     private final Thread[] workers;
-    private final AtomicBoolean running = new AtomicBoolean(true);
 
     public ThreadPool(int poolSize) {
         workers = new Thread[poolSize];
         for (int i = 0; i < poolSize; i++) {
-            Worker worker = new Worker(taskQueue, running);
+            Worker worker = new Worker(taskQueue);
             workers[i] = new Thread(worker, "Assembler-" + i);
             workers[i].start();
         }
     }
 
     public void submit(Runnable task) {
-        if (!running.get() || task == null) {
+        if (task == null) {
             return;
         }
         synchronized (taskQueue) {
@@ -35,7 +34,6 @@ public class ThreadPool {
     }
 
     public void shutdown() {
-        running.set(false);
         for (Thread worker : workers) worker.interrupt();
         synchronized (taskQueue) {
             taskQueue.notifyAll();

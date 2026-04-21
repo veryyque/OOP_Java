@@ -3,11 +3,11 @@ package ru.nsu.ccfit.vmoskalyuk.Factory.model.dealers;
 
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.details.Car;
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.storage.Storage;
-import ru.nsu.ccfit.vmoskalyuk.Factory.model.observable.Observer;
 
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.function.Consumer;
 
 public class Dealer implements Runnable {
 
@@ -15,18 +15,16 @@ public class Dealer implements Runnable {
 
     private final Storage<Car> carStorage;
     private final int number;
-    private final Observer saleObserver;
-    private final PrintWriter logWriter;        // единый лог от CarFactory
+    private final Consumer<SaleEvent> saleCallback;
+    private final PrintWriter logWriter;
     private final boolean saleLoggingEnabled;
 
     private volatile int delayMs;
-    private volatile boolean running = true;
 
-    public Dealer(Storage<Car> carStorage, int number, Observer saleObserver,
-                  int initialDelay, PrintWriter logWriter, boolean saleLoggingEnabled) {
+    public Dealer(Storage<Car> carStorage, int number, Consumer<SaleEvent> saleCallback, int initialDelay, PrintWriter logWriter, boolean saleLoggingEnabled) {
         this.carStorage = carStorage;
         this.number = number;
-        this.saleObserver = saleObserver;
+        this.saleCallback = saleCallback;
         this.logWriter = logWriter;
         this.saleLoggingEnabled = saleLoggingEnabled;
         this.delayMs = Math.max(10, initialDelay);
@@ -38,17 +36,15 @@ public class Dealer implements Runnable {
 
     @Override
     public void run() {
-        while (running && !Thread.currentThread().isInterrupted()) {
+        while (!Thread.currentThread().isInterrupted()) {
             try {
                 Car car = carStorage.take();
 
                 if (car == null) continue;
 
                 logSale(car);
-
-                // Уведомляем CarFactory через Observer
-                if (saleObserver != null) {
-                    saleObserver.update(null, new SaleEvent(number, car));
+                if (saleCallback != null) {
+                    saleCallback.accept(new SaleEvent(number, car));
                 }
 
                 Thread.sleep(delayMs);
@@ -75,17 +71,6 @@ public class Dealer implements Runnable {
         }
     }
 
-    public void shutdown() {
-        running = false;
-    }
-
-    public static class SaleEvent {
-        public final int dealerNumber;
-        public final Car car;
-
-        public SaleEvent(int dealerNumber, Car car) {
-            this.dealerNumber = dealerNumber;
-            this.car = car;
-        }
+    public record SaleEvent(int dealerNumber, Car car) {
     }
 }

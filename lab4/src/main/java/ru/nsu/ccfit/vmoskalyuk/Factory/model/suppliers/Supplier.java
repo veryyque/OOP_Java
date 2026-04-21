@@ -17,7 +17,6 @@ public abstract class Supplier<T extends Detail> implements Runnable {
     protected final PrintWriter logWriter;
 
     protected volatile int delayMs;
-    protected volatile boolean running = true;
 
     public Supplier(Storage<T> storage, int delayMs, String supplierType, PrintWriter logWriter) {
         this.storage = storage;
@@ -32,20 +31,14 @@ public abstract class Supplier<T extends Detail> implements Runnable {
         this.delayMs = Math.max(10, delayMs);
     }
 
-    public void shutdown() {
-        running = false;
-    }
-
     @Override
     public void run() {
-        while (running && !Thread.currentThread().isInterrupted()) {
+        while (!Thread.currentThread().isInterrupted()) {
             try {
                 T detail = createDetail();
 
-                // Логируем создание детали
                 logCreation(detail);
 
-                // Кладём на склад
                 storage.put(detail);
 
                 Thread.sleep(delayMs);
@@ -66,9 +59,5 @@ public abstract class Supplier<T extends Detail> implements Runnable {
             logWriter.println(logLine);
             logWriter.flush();
         }
-    }
-
-    public String getSupplierType() {
-        return supplierType;
     }
 }

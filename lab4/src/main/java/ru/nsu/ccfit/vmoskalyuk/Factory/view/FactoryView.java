@@ -8,14 +8,12 @@ import java.util.function.Consumer;
 
 public class FactoryView extends JFrame {
 
-    // ==================== Цвета ====================
     private static final Color BURGUNDY_DARK_BG = new Color(74, 18, 32);   // фон окна
     private static final Color BURGUNDY_MAIN = new Color(128, 32, 54);
     private static final Color CARD_BG = new Color(255, 255, 255);
     private static final Color TEXT_DARK = new Color(40, 28, 32);
     private static final Color TEXT_LIGHT = new Color(110, 85, 90);
 
-    // Метки
     private final JLabel bodyCountLabel = new JLabel("0", SwingConstants.CENTER);
     private final JLabel motorCountLabel = new JLabel("0", SwingConstants.CENTER);
     private final JLabel accessoryCountLabel = new JLabel("0", SwingConstants.CENTER);
@@ -62,7 +60,6 @@ public class FactoryView extends JFrame {
         });
     }
 
-    /** Карточка с большим круглым радиусом */
     private JPanel createCardPanel(String title, JPanel content) {
         JPanel card = new JPanel(new BorderLayout()) {
             @Override
@@ -89,7 +86,6 @@ public class FactoryView extends JFrame {
         return card;
     }
 
-    // ==================== Панель складов (без цветных рамок) ====================
     private JPanel createStoragePanel() {
         JPanel panel = new JPanel(new GridLayout(4, 2, 16, 18));
         panel.setOpaque(false);
@@ -114,7 +110,6 @@ public class FactoryView extends JFrame {
         panel.add(valueLabel);
     }
 
-    // ==================== Панель "Произведено всего" ====================
     private JPanel createProductionPanel() {
         JPanel panel = new JPanel(new GridLayout(5, 2, 16, 14));
         panel.setOpaque(false);
@@ -140,7 +135,6 @@ public class FactoryView extends JFrame {
         panel.add(valueLabel);
     }
 
-    // ==================== Панель управления ====================
     private JPanel createControlPanel() {
         JPanel panel = new JPanel(new GridLayout(4, 2, 16, 22));
         panel.setOpaque(false);
@@ -207,7 +201,6 @@ public class FactoryView extends JFrame {
         return slider;
     }
 
-    // ====================== Обновление статистики ======================
     public void updateStats(int bodyCount, int motorCount, int accessoryCount, int carCount,
                             int totalBodies, int totalMotors, int totalAccessories,
                             int totalCars, int pendingTasks) {
@@ -227,19 +220,19 @@ public class FactoryView extends JFrame {
     }
 
     public void setBodySpeedListener(Consumer<Integer> listener) {
-        bodySlider.addChangeListener(e -> listener.accept(bodySlider.getValue()));
+        bodySlider.addChangeListener(_ -> listener.accept(bodySlider.getValue()));
     }
 
     public void setMotorSpeedListener(Consumer<Integer> listener) {
-        motorSlider.addChangeListener(e -> listener.accept(motorSlider.getValue()));
+        motorSlider.addChangeListener(_ -> listener.accept(motorSlider.getValue()));
     }
 
     public void setAccessorySpeedListener(Consumer<Integer> listener) {
-        accessorySlider.addChangeListener(e -> listener.accept(accessorySlider.getValue()));
+        accessorySlider.addChangeListener(_ -> listener.accept(accessorySlider.getValue()));
     }
 
     public void setDealerSpeedListener(Consumer<Integer> listener) {
-        dealerSlider.addChangeListener(e -> listener.accept(dealerSlider.getValue()));
+        dealerSlider.addChangeListener(w2_ -> listener.accept(dealerSlider.getValue()));
     }
 
     public void setInitialDelays(int bodyDelay, int motorDelay, int accessoryDelay, int dealerDelay) {

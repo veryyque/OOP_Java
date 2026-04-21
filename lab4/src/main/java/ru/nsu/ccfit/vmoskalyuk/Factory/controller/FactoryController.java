@@ -1,4 +1,3 @@
-// ru/nsu/ccfit/vmoskalyuk/Factory/controller/FactoryController.java
 package ru.nsu.ccfit.vmoskalyuk.Factory.controller;
 
 import ru.nsu.ccfit.vmoskalyuk.Factory.model.CarFactory;
@@ -17,14 +16,10 @@ public class FactoryController {
         this.model = model;
         this.view = view;
 
+        //ссылка на статический метод класса для обновления интерфейса
         model.addListener(this::updateView);
 
-        view.setInitialDelays(
-                model.getInitialBodyDelay(),
-                model.getInitialMotorDelay(),
-                model.getInitialAccessoryDelay(),
-                model.getInitialDealerDelay()
-        );
+        view.setInitialDelays(model.getInitialBodyDelay(), model.getInitialMotorDelay(), model.getInitialAccessoryDelay(), model.getInitialDealerDelay());
 
         view.setBodySpeedListener(model::setBodyDelay);
         view.setMotorSpeedListener(model::setMotorDelay);
@@ -33,7 +28,7 @@ public class FactoryController {
 
         view.setCloseListener(this::handleWindowClosing);
 
-        this.refreshTimer = new Timer(100, e -> updateView());
+        this.refreshTimer = new Timer(100, _ -> updateView());
     }
 
     private void handleWindowClosing() {
@@ -51,19 +46,17 @@ public class FactoryController {
     }
 
     private void updateView() {
-        SwingUtilities.invokeLater(() -> {
-            view.updateStats(
-                    model.getBodyCount(),
-                    model.getMotorCount(),
-                    model.getAccessoryCount(),
-                    model.getCarCount(),
-                    model.getTotalBodiesProduced(),
-                    model.getTotalMotorsProduced(),
-                    model.getTotalAccessoriesProduced(),
-                    model.getTotalCarsProduced(),
-                    model.getPendingTasks()
-            );
-        });
+        SwingUtilities.invokeLater(() -> view.updateStats(
+                model.getBodyCount(),
+                model.getMotorCount(),
+                model.getAccessoryCount(),
+                model.getCarCount(),
+                model.getTotalBodiesProduced(),
+                model.getTotalMotorsProduced(),
+                model.getTotalAccessoriesProduced(),
+                model.getTotalCarsProduced(),
+                model.getPendingTasks()
+        ));
     }
 
     public void start() {

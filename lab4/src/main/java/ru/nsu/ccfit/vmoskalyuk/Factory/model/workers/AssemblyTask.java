@@ -20,12 +20,7 @@ public class AssemblyTask implements Runnable {
     private final CarFactory carFactory;
     private final PrintWriter logWriter;
 
-    public AssemblyTask(Storage<Body> bodyStorage,
-                        Storage<Motor> motorStorage,
-                        Storage<Accessory> accessoryStorage,
-                        Storage<Car> carStorage,
-                        CarFactory carFactory,
-                        PrintWriter logWriter) {
+    public AssemblyTask(Storage<Body> bodyStorage, Storage<Motor> motorStorage, Storage<Accessory> accessoryStorage, Storage<Car> carStorage, CarFactory carFactory, PrintWriter logWriter) {
         this.bodyStorage = bodyStorage;
         this.motorStorage = motorStorage;
         this.accessoryStorage = accessoryStorage;
@@ -47,13 +42,10 @@ public class AssemblyTask implements Runnable {
 
             Car car = new Car(body, motor, accessory);
 
-            // Логируем сборку
             logAssembly(car);
 
-            // Кладём готовую машину на склад
             carStorage.put(car);
 
-            // Уведомляем фабрику
             carFactory.onCarAssembled(car);
 
         } catch (InterruptedException e) {
@@ -66,8 +58,9 @@ public class AssemblyTask implements Runnable {
 
     private void logAssembly(Car car) {
         String timestamp = LocalDateTime.now().format(TIME_FORMAT);
-        String logLine = String.format("%s [AssemblyTask] ASSEMBLED Car #%d (Body:%d, Motor:%d, Accessory:%d)",
-                timestamp, car.getId(),
+        String workerName = Thread.currentThread().getName();
+        String logLine = String.format("%s [AssemblyTask] Worker %s ASSEMBLED Car #%d (Body:%d, Motor:%d, Accessory:%d)",
+                timestamp, workerName, car.getId(),
                 car.getBody().getId(), car.getMotor().getId(), car.getAccessory().getId());
 
         synchronized (logWriter) {
