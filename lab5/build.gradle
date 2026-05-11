@@ -1,0 +1,39 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'ru.nsu.ccfit.vmoskalyuk'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:6.0.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'ru.nsu.ccfit.vmoskalyuk.Chat.client.SwingChatClient'
+}
+
+tasks.register('runServer', JavaExec) {
+    group = 'application'
+    description = 'Starts JSON chat server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ru.nsu.ccfit.vmoskalyuk.Chat.server.ChatServer'
+}
+
+tasks.register('runClient', JavaExec) {
+    group = 'application'
+    description = 'Starts Swing JSON chat client'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ru.nsu.ccfit.vmoskalyuk.Chat.client.SwingChatClient'
+}
+
+test {
+    useJUnitPlatform()
+}
