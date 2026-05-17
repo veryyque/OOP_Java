@@ -15,6 +15,11 @@ public class ChatServer {
     private final Map<String, ChatUser> usersBySession = new HashMap<>();
     private final Map<String, ChatUser> usersByName = new HashMap<>();
     private final ArrayDeque<Map<String, Object>> history = new ArrayDeque<>();
+    private final List<ClientHandler> clientHandlers = Collections.synchronizedList(new ArrayList<>());
+    private final List<Thread> clientThreads = Collections.synchronizedList(new ArrayList<>());
+    private volatile boolean running = true;
+    private volatile boolean shutdownStarted;
+    private ServerSocket serverSocket;
 
     public ChatServer(ServerConfig config) {
         this.config = config;
@@ -22,22 +27,111 @@ public class ChatServer {
 
     public static void main(String[] args) {
         ServerConfig config = ServerConfig.load(args);
+        ChatServer server = new ChatServer(config);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("=== JVM SHUTDOWN HOOK TRIGGERED ===");
+            server.shutdown();
+        }, "shutdown-hook"));
+        Thread consoleThread = new Thread(server::waitForShutdownCommand, "chat-server-console");
+        consoleThread.start();
         try {
-            new ChatServer(config).start();
+            server.start();
         } catch (IOException exception) {
-            System.err.println("Server error: " + exception.getMessage());
+            if (server.running) {
+                System.err.println("Server error: " + exception.getMessage());
+            }
+        } finally {
+            server.shutdown();
         }
     }
 
     public void start() throws IOException {
         log("Server started on port " + config.port());
-        try (ServerSocket serverSocket = new ServerSocket(config.port())) {
-            while (true) {
-                Socket socket = serverSocket.accept();
+        try (ServerSocket currentServerSocket = new ServerSocket(config.port())) {
+            serverSocket = currentServerSocket;
+            while (running && !currentServerSocket.isClosed()) {
+                Socket socket = currentServerSocket.accept();
                 socket.setSoTimeout(config.clientTimeoutMs());
                 log("Connection from " + socket.getRemoteSocketAddress());
-                new Thread(new ClientHandler(this, socket), "client-" + socket.getPort()).start();
+                ClientHandler handler = new ClientHandler(this, socket);
+                Thread thread = new Thread(handler, "client-" + socket.getPort());
+                clientHandlers.add(handler);
+                clientThreads.add(thread);
+                log("Active client threads: " + clientThreads.size());
+                thread.start();
             }
+        }
+    }
+
+    public void shutdown() {
+        if (shutdownStarted) {
+            return;
+        }
+        shutdownStarted = true;
+        running = false;
+        closeServerSocket();
+
+        List<ClientHandler> handlersCopy;
+        synchronized (clientHandlers) {
+            handlersCopy = new ArrayList<>(clientHandlers);
+        }
+        for (ClientHandler handler : handlersCopy) {
+            handler.closeSocket();
+        }
+
+        List<Thread> threadsCopy;
+        synchronized (clientThreads) {
+            threadsCopy = new ArrayList<>(clientThreads);
+        }
+        for (Thread thread : threadsCopy) {
+            thread.interrupt();
+        }
+        for (Thread thread : threadsCopy) {
+            if (thread == Thread.currentThread()) {
+                continue;
+            }
+            try {
+                thread.join(1000);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
+        synchronized (clientThreads) {
+            clientThreads.clear();
+        }
+        synchronized (clientHandlers) {
+            clientHandlers.clear();
+        }
+        log("Server stopped. Active client threads: " + clientThreads.size());
+    }
+
+    public void clientFinished(ClientHandler handler) {
+        clientHandlers.remove(handler);
+        clientThreads.remove(Thread.currentThread());
+        log("Client thread finished. Active client threads: " + clientThreads.size());
+    }
+
+    private void waitForShutdownCommand() {
+        Scanner scanner = new Scanner(System.in);
+        while (running && scanner.hasNextLine()) {
+            String command = scanner.nextLine().trim();
+            if ("stop".equalsIgnoreCase(command) || "exit".equalsIgnoreCase(command)) {
+                shutdown();
+                return;
+            }
+        }
+    }
+
+    private void closeServerSocket() {
+        if (serverSocket == null || serverSocket.isClosed()) {
+            return;
+        }
+        try {
+            serverSocket.close();
+        } catch (IOException exception) {
+            log("Cannot close server socket: " + exception.getMessage());
         }
     }
 

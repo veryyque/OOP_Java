@@ -14,6 +14,7 @@ public class ChatClientConnection implements Closeable {
     private final Consumer<Object> listener;
     private volatile boolean running = true;
     private String session;
+    private Thread readerThread;
 
     public ChatClientConnection(String host, int port, Consumer<Object> listener) throws IOException {
         this.connection = new Connection(new Socket(host, port));
@@ -55,7 +56,7 @@ public class ChatClientConnection implements Closeable {
     }
 
     private void startReader() {
-        Thread reader = new Thread(() -> {
+        readerThread = new Thread(() -> {
             while (running) {
                 try {
                     Object message = connection.read();
@@ -73,14 +74,16 @@ public class ChatClientConnection implements Closeable {
                 }
             }
         }, "server-reader");
-        reader.setDaemon(true); //для точного завершения потока если не нажать disconnect и закрыть окно
-        reader.start();
+        readerThread.start();
     }
 
     @Override
     public void close() throws IOException {
         running = false;
         connection.close();
+        if (readerThread != null && readerThread != Thread.currentThread()) {
+            readerThread.interrupt();
+        }
     }
 
     public boolean isConnected() {

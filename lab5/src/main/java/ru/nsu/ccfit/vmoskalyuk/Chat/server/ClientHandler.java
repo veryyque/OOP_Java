@@ -7,6 +7,7 @@ import ru.nsu.ccfit.vmoskalyuk.Chat.Messages;
 import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Map;
@@ -27,17 +28,25 @@ public class ClientHandler implements Runnable {
     public void run() {
         try (JsonConnection currentConnection = new JsonConnection(socket)) {
             connection = currentConnection;
-            while (!socket.isClosed()) {
+            while (!socket.isClosed() && !Thread.currentThread().isInterrupted()) {
                 try {
-                    process(currentConnection.readMessage());
+                    Map<String, Object> message = currentConnection.readMessage();
+                    process(message);
+                } catch (EOFException | SocketException exception) {
+                    break;
                 } catch (IOException | RuntimeException exception) {
-                    String message = exception.getMessage() == null || exception.getMessage().isBlank()
-                            ? "Request processing error"
-                            : exception.getMessage();
+                    if (Thread.currentThread().isInterrupted() || socket.isClosed()) {
+                        break;
+                    }
+                    String message = exception.getMessage() == null || exception.getMessage().isBlank() ? "Request processing error" : exception.getMessage();
                     server.log("Client request error " + visibleName() + ": " + message);
                     send(Messages.error(message));
                     if (user == null) {
                         socket.close();
+                        break;
+                    }
+                    if (socket.isClosed()) {
+                        break;
                     }
                 }
             }
@@ -46,6 +55,9 @@ public class ClientHandler implements Runnable {
         } catch (EOFException exception) {
             server.log("Client disconnected: " + visibleName());
         } catch (IOException | RuntimeException exception) {
+            if (Thread.currentThread().isInterrupted() || socket.isClosed()) {
+                return;
+            }
             String message = exception.getMessage() == null || exception.getMessage().isBlank()
                     ? "Connection error"
                     : exception.getMessage();
@@ -53,6 +65,9 @@ public class ClientHandler implements Runnable {
             send(Messages.error(message));
         } finally {
             server.logout(this);
+            closeSocket();
+            Thread.currentThread().interrupt();
+            server.clientFinished(this);
         }
     }
 
@@ -64,6 +79,8 @@ public class ClientHandler implements Runnable {
             connection.sendMessage(message);
         } catch (IOException exception) {
             server.log("Cannot send to " + visibleName() + ": " + exception.getMessage());
+            closeSocket();
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -73,6 +90,17 @@ public class ClientHandler implements Runnable {
 
     public void setUser(ChatUser user) {
         this.user = user;
+    }
+
+    public void closeSocket() {
+        if (socket.isClosed()) {
+            return;
+        }
+        try {
+            socket.close();
+        } catch (IOException exception) {
+            server.log("Cannot close client socket " + visibleName() + ": " + exception.getMessage());
+        }
     }
 
     private void process(Map<String, Object> message) throws IOException {
@@ -89,6 +117,7 @@ public class ClientHandler implements Runnable {
                 server.requireUser(JsonUtil.string(command.get("session")));
                 send(Messages.success());
                 socket.close();
+                Thread.currentThread().interrupt();
             }
             default -> send(Messages.error("Unknown command: " + name));
         }

@@ -17,6 +17,7 @@ public class ChatClientConnection implements Closeable {
     private final Consumer<Map<String, Object>> listener; //функциональный интерфейс
     private volatile boolean running = true;
     private String session;
+    private Thread readerThread;
 
     public ChatClientConnection(String host, int port, Consumer<Map<String, Object>> listener) throws IOException {
         this.connection = new JsonConnection(new Socket(host, port));
@@ -53,15 +54,17 @@ public class ChatClientConnection implements Closeable {
     }
 
     private void startReader() {
-        Thread reader = new Thread(() -> {
+        readerThread = new Thread(() -> {
             while (running) {
                 try {
                     Map<String, Object> message = connection.readMessage();
                     checkError(message);
                     listener.accept(message);
                 } catch (EOFException exception) {
+                    if (running) {
+                        listener.accept(Messages.error("Connection closed"));
+                    }
                     running = false;
-                    listener.accept(Messages.error("Connection closed"));
                 } catch (IOException | RuntimeException exception) {
                     if (running) {
                         String message = exception.getMessage() == null || exception.getMessage().isBlank()
@@ -73,14 +76,16 @@ public class ChatClientConnection implements Closeable {
                 }
             }
         }, "server-reader");
-        reader.setDaemon(true);
-        reader.start();
+        readerThread.start();
     }
 
     @Override
     public void close() throws IOException {
         running = false;
         connection.close();
+        if (readerThread != null && readerThread != Thread.currentThread()) {
+            readerThread.interrupt();
+        }
     }
 
     private void checkError(Map<String, Object> message) throws IOException {
